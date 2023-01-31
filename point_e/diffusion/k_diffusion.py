@@ -22,8 +22,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
+import pdb
 import numpy as np
 import torch as th
+torch=th
 
 from .gaussian_diffusion import GaussianDiffusion, mean_flat
 
@@ -114,6 +116,16 @@ def karras_sample(*args, **kwargs):
         last = x["x"]
     return last
 
+def prepare_latents(pcd, encoder, scheduler, timestep):
+    init_latents = encoder.encode(pcd).latent_dist.sample()
+    init_latents = encoder.config.scaling_factor * init_latents
+    init_latents = torch.cat([init_latents], dim=0)
+    noise = th.randn(init_latents.shape, device=init_latents.device, dtype=init_latents.dtype)
+    init_latents = scheduler.add_noise(init_latents, noise, timestep)
+    latents = init_latents
+
+    return latents
+
 
 def karras_sample_progressive(
     diffusion,
@@ -135,7 +147,11 @@ def karras_sample_progressive(
     guidance_scale=0.0,
 ):
     sigmas = get_sigmas_karras(steps, sigma_min, sigma_max, rho, device=device)
-    x_T = th.randn(*shape, device=device) * sigma_max
+    if 'pcd' in model_kwargs:
+        pdb.set_trace()
+        x_T = model_kwargs['pcd'] + th.randn(*shape, device=device) * sigma_max
+    else:
+        x_T = th.randn(*shape, device=device) * sigma_max
     sample_fn = {"heun": sample_heun, "dpm": sample_dpm, "ancestral": sample_euler_ancestral}[
         sampler
     ]
